@@ -2,7 +2,7 @@
 # CONFIG — Meka wenas karanna
 # ══════════════════════════════════════════════
 
-TELEGRAM_BOT_TOKEN = "8791406908:AAE1ijQxz3IeXMFsSSPaEs38xu9XhpDcGic"
+TELEGRAM_BOT_TOKEN = "8905811864:AAEaEzjyirk1dJivfvtQWtumL3mXXCh5-SQ"
 TELEGRAM_CHAT_ID   = "1450144996"
 
 # Paper trading starting balance
@@ -36,11 +36,11 @@ SCORE_ALLOC_PCT = {
 
 # Binance endpoints (geo-block bypass)
 BINANCE_ENDPOINTS = [
-    "https://api.binance.com",
-    "https://api1.binance.com",
-    "https://api2.binance.com",
-    "https://api3.binance.com",
-    "https://api4.binance.com",
+    "https://api.binance.us",
+    "https://api1.binance.us",
+    "https://api2.binance.us",
+    "https://api3.binance.us",
+    "https://api4.binance.us",
 ]
 
 LK_OFFSET_SEC = 5 * 3600 + 30 * 60  # Sri Lanka UTC+5:30
