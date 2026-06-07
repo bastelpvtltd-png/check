@@ -78,4 +78,3 @@ cryptobot/
 ├── render.yaml      # Render deploy config
 └── Procfile         # Railway/Heroku config
 ```
-"# check" 

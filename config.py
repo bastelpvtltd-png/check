@@ -37,10 +37,10 @@ SCORE_ALLOC_PCT = {
 # Binance endpoints (geo-block bypass)
 BINANCE_ENDPOINTS = [
     "https://api.binance.us",
-    "https://api1.binance.us",
-    "https://api2.binance.us",
-    "https://api3.binance.us",
-    "https://api4.binance.us",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+    "https://api3.binance.com",
+    "https://api4.binance.com",
 ]
 
 LK_OFFSET_SEC = 5 * 3600 + 30 * 60  # Sri Lanka UTC+5:30
