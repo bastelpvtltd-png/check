@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚀 CryptoBot Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --blue: #58a6ff; --purple: #bc8cff;
+    --green-dim: rgba(63,185,80,0.12); --red-dim: rgba(248,81,73,0.12);
+    --blue-dim: rgba(88,166,255,0.12);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+
+  /* Header */
+  .header { background:var(--bg2); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .header h1 { font-size:20px; font-weight:700; }
+  .header h1 span { color:var(--blue); }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--red); display:inline-block; margin-right:6px; }
+  .status-dot.active { background:var(--green); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .scanner-badge { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+
+  /* Controls */
+  .controls { padding:16px 24px; display:flex; gap:10px; flex-wrap:wrap; border-bottom:1px solid var(--border); }
+  .btn { padding:8px 16px; border-radius:8px; border:1px solid var(--border); cursor:pointer; font-size:13px; font-weight:600; transition:all .2s; }
+  .btn-green { background:var(--green-dim); color:var(--green); border-color:var(--green); }
+  .btn-green:hover { background:var(--green); color:#000; }
+  .btn-red { background:var(--red-dim); color:var(--red); border-color:var(--red); }
+  .btn-red:hover { background:var(--red); color:#fff; }
+  .btn-blue { background:var(--blue-dim); color:var(--blue); border-color:var(--blue); }
+  .btn-blue:hover { background:var(--blue); color:#000; }
+  .btn-gray { background:var(--bg3); color:var(--muted); }
+  .btn-gray:hover { background:var(--border); color:var(--text); }
+
+  /* Main layout */
+  .main { padding:20px 24px; display:grid; gap:20px; }
+
+  /* Stats cards */
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+  .stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .stat-card .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px; }
+  .stat-card .value { font-size:24px; font-weight:700; }
+  .stat-card .sub { font-size:12px; color:var(--muted); margin-top:4px; }
+  .green { color:var(--green) !important; }
+  .red   { color:var(--red)   !important; }
+  .blue  { color:var(--blue)  !important; }
+  .yellow{ color:var(--yellow)!important; }
+
+  /* Section */
+  .section { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .section-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .section-header h2 { font-size:15px; font-weight:600; }
+  .badge { font-size:11px; background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:2px 10px; color:var(--muted); }
+
+  /* Trade table */
+  .trades-table { width:100%; border-collapse:collapse; }
+  .trades-table th { padding:10px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); border-bottom:1px solid var(--border); font-weight:600; }
+  .trades-table td { padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); }
+  .trades-table tr:last-child td { border-bottom:none; }
+  .trades-table tr:hover td { background:var(--bg3); }
+  .coin-tag { font-weight:700; color:var(--blue); }
+  .dir-long  { background:var(--green-dim); color:var(--green); padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; }
+  .dir-short { background:var(--red-dim);   color:var(--red);   padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; }
+  .outcome-win { color:var(--green); font-weight:700; }
+  .outcome-loss{ color:var(--red);   font-weight:700; }
+  .outcome-be  { color:var(--yellow);font-weight:700; }
+  .outcome-open{ color:var(--blue);  font-weight:700; }
+  .score-badge { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; }
+  .pnl-pos { color:var(--green); }
+  .pnl-neg { color:var(--red);   }
+  .price-mono { font-family:monospace; font-size:12px; color:var(--muted); }
+
+  /* Empty state */
+  .empty { padding:40px; text-align:center; color:var(--muted); font-size:14px; }
+  .empty .icon { font-size:36px; margin-bottom:12px; }
+
+  /* Toast */
+  #toast-container { position:fixed; top:70px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+  .toast { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; font-size:13px; min-width:220px; max-width:320px; animation:slide-in .3s ease; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+  .toast.win  { border-left:3px solid var(--green); }
+  .toast.loss { border-left:3px solid var(--red); }
+  .toast.info { border-left:3px solid var(--blue); }
+  @keyframes slide-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  /* Winrate bar */
+  .wr-bar { background:var(--bg3); border-radius:4px; height:6px; margin-top:8px; overflow:hidden; }
+  .wr-fill { height:100%; background:var(--green); border-radius:4px; transition:width .5s; }
+
+  /* Responsive */
+  @media(max-width:768px) {
+    .controls { padding:12px 16px; }
+    .main { padding:12px 16px; }
+    .trades-table td, .trades-table th { padding:8px 10px; font-size:12px; }
+    .stats-grid { grid-template-columns:repeat(2,1fr); }
+  }
+
+  /* Scan animation */
+  .scanning-anim { animation:spin 1s linear infinite; display:inline-block; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🚀 Crypto<span>Bot</span> — Paper Trading</h1>
+  <div class="scanner-badge">
+    <span class="status-dot" id="scanner-dot"></span>
+    <span id="scanner-label">Offline</span>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-green" onclick="startScanner()">▶ Start Scanner</button>
+  <button class="btn btn-red"   onclick="stopScanner()">⏹ Stop</button>
+  <button class="btn btn-blue"  onclick="scanNow()">🔍 Scan Now</button>
+  <button class="btn btn-gray"  onclick="resetBot()" style="margin-left:auto">🔄 Reset</button>
+</div>
+
+<div class="main">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+      <div class="label">Balance</div>
+      <div class="value blue" id="s-balance">$0.00</div>
+      <div class="sub">Starting: <span id="s-starting">$0</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total P&L</div>
+      <div class="value" id="s-pnl">$0.00</div>
+      <div class="sub">ROI: <span id="s-roi">0%</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Win Rate</div>
+      <div class="value green" id="s-wr">0%</div>
+      <div class="wr-bar"><div class="wr-fill" id="wr-fill" style="width:0%"></div></div>
+      <div class="sub" id="s-wl">0W / 0L / 0BE</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Trades</div>
+      <div class="value" id="s-total">0</div>
+      <div class="sub">Open: <span id="s-open">0</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Wins</div>
+      <div class="value green" id="s-wins">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Losses</div>
+      <div class="value red" id="s-losses">0</div>
+    </div>
+  </div>
+
+  <!-- Open trades -->
+  <div class="section">
+    <div class="section-header">
+      <h2>📂 Open Trades</h2>
+      <span class="badge" id="open-count">0</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="trades-table">
+        <thead>
+          <tr>
+            <th>Coin</th><th>Dir</th><th>Score</th>
+            <th>Entry</th><th>TP1</th><th>TP2</th><th>SL</th>
+            <th>Alloc</th><th>Live P&L</th><th>Opened</th>
+          </tr>
+        </thead>
+        <tbody id="open-tbody">
+          <tr><td colspan="10" class="empty"><div class="icon">📭</div>No open trades</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Closed trades -->
+  <div class="section">
+    <div class="section-header">
+      <h2>📋 Trade History</h2>
+      <span class="badge" id="closed-count">0</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="trades-table">
+        <thead>
+          <tr>
+            <th>Coin</th><th>Dir</th><th>Score</th><th>Outcome</th>
+            <th>Entry</th><th>Alloc</th><th>P&L</th>
+            <th>Balance After</th><th>Signal Time</th>
+          </tr>
+        </thead>
+        <tbody id="closed-tbody">
+          <tr><td colspan="9" class="empty"><div class="icon">📭</div>No closed trades yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+const socket = io();
+let state = {};
+
+socket.on('connect', () => console.log('Connected'));
+socket.on('state_update', (data) => { state = data; renderAll(data); });
+socket.on('new_signal', (trade) => {
+  showToast(trade);
+});
+
+function renderAll(d) {
+  // Stats
+  document.getElementById('s-balance').textContent  = '$' + d.balance.toFixed(2);
+  document.getElementById('s-starting').textContent = '$' + d.starting.toFixed(2);
+  const pnlEl = document.getElementById('s-pnl');
+  pnlEl.textContent = (d.total_pnl >= 0 ? '+' : '') + '$' + d.total_pnl.toFixed(2);
+  pnlEl.className = 'value ' + (d.total_pnl >= 0 ? 'green' : 'red');
+  document.getElementById('s-roi').textContent  = (d.roi >= 0 ? '+' : '') + d.roi.toFixed(2) + '%';
+  document.getElementById('s-wr').textContent   = d.win_rate + '%';
+  document.getElementById('wr-fill').style.width = d.win_rate + '%';
+  document.getElementById('s-wl').textContent   = d.wins+'W / '+d.losses+'L / '+d.breakevens+'BE';
+  document.getElementById('s-total').textContent = d.total_trades;
+  document.getElementById('s-open').textContent  = d.open_trades.length;
+  document.getElementById('s-wins').textContent  = d.wins;
+  document.getElementById('s-losses').textContent = d.losses;
+
+  // Scanner status
+  const running = d.scanner && d.scanner.running;
+  const dot = document.getElementById('scanner-dot');
+  const lbl = document.getElementById('scanner-label');
+  dot.className = 'status-dot' + (running ? ' active' : '');
+  lbl.textContent = running ? '🟢 Scanner Live' : '⚫ Scanner Offline';
+
+  // Open trades
+  renderOpenTrades(d.open_trades);
+
+  // Closed trades
+  renderClosedTrades(d.closed_trades);
+}
+
+function renderOpenTrades(trades) {
+  document.getElementById('open-count').textContent = trades.length;
+  const tbody = document.getElementById('open-tbody');
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty"><div class="icon">📭</div>No open trades</td></tr>';
+    return;
+  }
+  tbody.innerHTML = trades.map(t => {
+    const livePct = (t.live_pct || 0).toFixed(2);
+    const livePnl = (t.live_pnl || 0).toFixed(4);
+    const pnlClass = (t.live_pct || 0) >= 0 ? 'pnl-pos' : 'pnl-neg';
+    return `<tr>
+      <td><span class="coin-tag">${t.coin}</span></td>
+      <td><span class="dir-${t.direction.toLowerCase()}">${t.direction}</span></td>
+      <td><span class="score-badge">${t.score}</span></td>
+      <td class="price-mono">$${t.entry.toFixed(4)}</td>
+      <td class="price-mono green">$${t.tp1.toFixed(4)}</td>
+      <td class="price-mono" style="color:#1b5e20">$${t.tp2.toFixed(4)}</td>
+      <td class="price-mono red">$${t.sl.toFixed(4)}</td>
+      <td>$${t.allocated_usd.toFixed(2)}</td>
+      <td class="${pnlClass}">${livePct >= 0 ? '+' : ''}${livePct}% ($${livePnl})</td>
+      <td style="color:var(--muted);font-size:12px">${t.opened_at || t.sig_time}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderClosedTrades(trades) {
+  document.getElementById('closed-count').textContent = trades.length;
+  const tbody = document.getElementById('closed-tbody');
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty"><div class="icon">📭</div>No closed trades yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = trades.map(t => {
+    const outcomeClass = t.result_label === 'WIN' ? 'outcome-win' :
+                         t.result_label === 'LOSS' ? 'outcome-loss' :
+                         t.result_label === 'BREAKEVEN' ? 'outcome-be' : 'outcome-open';
+    const pnlClass = (t.pnl_usd || 0) >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const em = t.result_label === 'WIN' ? '✅' : t.result_label === 'LOSS' ? '❌' : t.result_label === 'BREAKEVEN' ? '🟡' : '🔵';
+    return `<tr>
+      <td><span class="coin-tag">${t.coin}</span></td>
+      <td><span class="dir-${t.direction.toLowerCase()}">${t.direction}</span></td>
+      <td><span class="score-badge">${t.score}</span></td>
+      <td class="${outcomeClass}">${em} ${t.result_label || t.outcome}</td>
+      <td class="price-mono">$${(t.entry||0).toFixed(4)}</td>
+      <td>$${(t.allocated_usd||0).toFixed(2)}</td>
+      <td class="${pnlClass}">${(t.pnl_usd||0) >= 0 ? '+' : ''}$${(t.pnl_usd||0).toFixed(2)}</td>
+      <td style="font-weight:700">$${(t.bal_after||0).toFixed(2)}</td>
+      <td style="color:var(--muted);font-size:12px">${t.sig_time || ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showToast(trade) {
+  const isWin  = trade.result_label === 'WIN';
+  const isLoss = trade.result_label === 'LOSS';
+  const cls    = isWin ? 'win' : isLoss ? 'loss' : 'info';
+  const em     = isWin ? '✅' : isLoss ? '❌' : '🟡';
+  const pnl    = (trade.pnl_usd || 0).toFixed(2);
+  const toast  = document.createElement('div');
+  toast.className = `toast ${cls}`;
+  toast.innerHTML = `<strong>${em} ${trade.coin} ${trade.direction}</strong><br>
+    Score: ${trade.score} | ${trade.result_label}<br>
+    P&L: <strong>${pnl >= 0 ? '+' : ''}$${pnl}</strong>`;
+  document.getElementById('toast-container').prepend(toast);
+  setTimeout(() => toast.remove(), 6000);
+}
+
+async function startScanner() {
+  await fetch('/api/scanner/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({interval:60})});
+  toast2('🟢 Scanner started (every 60 min)');
+  setTimeout(() => fetch('/api/state').then(r=>r.json()).then(renderAll), 500);
+}
+async function stopScanner() {
+  await fetch('/api/scanner/stop', {method:'POST'});
+  toast2('⏹ Scanner stopped');
+  setTimeout(() => fetch('/api/state').then(r=>r.json()).then(renderAll), 500);
+}
+async function scanNow() {
+  toast2('🔍 Scanning now... (takes a few minutes)');
+  await fetch('/api/scan', {method:'POST'});
+}
+async function resetBot() {
+  if (!confirm('Reset all trades and balance to $' + (state.starting||100) + '?')) return;
+  await fetch('/api/reset', {method:'POST'});
+  toast2('🔄 Reset complete');
+  fetch('/api/state').then(r=>r.json()).then(renderAll);
+}
+
+function toast2(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast info';
+  t.textContent = msg;
+  document.getElementById('toast-container').prepend(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// Initial load
+fetch('/api/state').then(r => r.json()).then(renderAll);
+</script>
+</body>
+</html>
